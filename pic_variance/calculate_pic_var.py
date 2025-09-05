@@ -190,12 +190,9 @@ def generate_moments(variables, cov, max_moment=None):
         moments.append(m)
     return moments
 
-class FourTaxa:
-    def __init__(self):
-        self.cov = Matrix(
-
 if __name__ == "__main__":
     # balanced 6 taxa
+
     cov = (
         Matrix(
             [
@@ -247,4 +244,3 @@ if __name__ == "__main__":
 
     with gzip.open("pic_simple.pkl.gz", "wb") as outf:
         pickle.dump(pic_v, outf)
-
