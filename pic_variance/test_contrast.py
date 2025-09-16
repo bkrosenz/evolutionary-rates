@@ -383,7 +383,7 @@ if __name__ == "__main__":
             traits = {k: sympy.Symbol(f"x{i+1}") for i, k in enumerate(labs)}
             rate_f, contrasts_f = calculate_pic_rate(s, traits)
             moments = list(
-                reversed(generate_moments(list(traits.values()), cov, cov.shape[1] + 1))
+                reversed(generate_moments(list(traits.values()), cov, cov.shape[1] * 2))
             )
 
             def substitute_moments(expr):
