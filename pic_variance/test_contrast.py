@@ -369,7 +369,7 @@ if __name__ == "__main__":
     print(f"Calculated Contrasts: {contrasts_f}")
     print(f"Estimated Evolutionary Rate (sigma^2): {rate_f:.4f}")
 
-    n_jobs = 16 
+    n_jobs = 8
 
     with open("tree_topologies.nw", "r") as f:
         for line in f:
@@ -379,11 +379,10 @@ if __name__ == "__main__":
             print(f"\nProcessing tree: {s}")
 
             cov, labs = newick_to_phylo_cov(s)
-            cov = cov * sigma**2
             traits = {k: sympy.Symbol(f"x{i+1}") for i, k in enumerate(labs)}
             rate_f, contrasts_f = calculate_pic_rate(s, traits)
             moments = list(
-                reversed(generate_moments(list(traits.values()), cov, cov.shape[1] * 2))
+                reversed(generate_moments(list(traits.values()), cov, cov.shape[1] + 1))
             )
 
             def substitute_moments(expr):
@@ -396,11 +395,11 @@ if __name__ == "__main__":
             with Parallel(n_jobs=n_jobs) as parallel:
                 args = parallel(delayed(substitute_moments)(arg) for arg in pic_e.args)
             pic_e = simplify(func(*args))
-            print(r"Expected value of PIC estimator ($\hat{\sigma}^2$):", f"{pic_e}")
+            print(f"Expected value of PIC estimator (sigma^2): {pic_e}")
 
-            pic_v = sympy.expand(rate_f**2 - pic_e**2)
+            pic_v = sympy.expand(rate_f**2 - pic_e)
             func = pic_v.func
             with Parallel(n_jobs=n_jobs) as parallel:
                 args = parallel(delayed(substitute_moments)(arg) for arg in pic_v.args)
             pic_v = simplify(func(*args))
-            print(r"Variance of PIC estimator ($E[\hat{\sigma}^2-\sigma^2]^2$):", f"{pic_v}\n----\n")
+            print(f"Variance of PIC estimator (sigma^4): {pic_v}\n----\n")

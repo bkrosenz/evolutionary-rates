@@ -1,0 +1,26 @@
+--- Felsenstein's Independent Contrasts Calculator ---
+
+Input Newick Tree:
+((A:0.1, B:0.1):0.2, C:0.3);
+
+Input Tip Data:
+{'A': x0, 'B': x1, 'C': x2}
+
+Calculated Contrasts: [2.23606797749979*x0 - 2.23606797749979*x1, 0.674199862463242*x0 + 0.674199862463242*x1 - 1.34839972492648*x2]
+Number of Contrasts (n-1): 2
+
+Estimated Evolutionary Rate (sigma^2): 2.5*(x0 - x1)**2 + 0.909090909090909*(0.5*x0 + 0.5*x1 - x2)**2
+
+
+Estimated Evolutionary Rate substituted (sigma^2): 8.18181818181818
+
+==================================================
+
+Example from Felsenstein (1985):
+Tree: (((A:1, B:1):1, C:2):1, D:3);
+Data: {'A': -0.447, 'B': -0.566, 'C': 0.019, 'D': 0.948}
+
+Calculated Contrasts: [0.0841457069611991, -0.280891565249958, -0.557779304116637]
+Estimated Evolutionary Rate (sigma^2): 0.1324
+
+Processing tree: ((T1:a,T2:a):b,T3:a+b);
