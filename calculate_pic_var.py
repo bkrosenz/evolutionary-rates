@@ -1,15 +1,16 @@
 # Import the necessary modules from SymPy
-from sympy import symbols, simplify, factor, expand, lambdify, Matrix, prod, Add
+from sympy import symbols, simplify, factor, expand, lambdify, Matrix, prod
 import numpy as np
 import math
 from joblib import Parallel, delayed
 import itertools
-import pickle
+import pickle, gzip
 
-from sympy.parsing.sympy_parser import parse_expr
 from itertools import combinations, permutations, combinations_with_replacement
 from operator import mul
 from functools import *
+
+n_jobs=10
 
 # Define the symbols used in the expression
 # 'a', 'b', 'c', 'd' are general variables.
@@ -29,7 +30,7 @@ from functools import *
     sigma,
 ) = symbols("a b c d e f t0 t1 t2 t3 t4 sigma")
 
-vars = [
+variables = [
     a,
     b,
     c,
@@ -45,6 +46,53 @@ root_to_tip = sum(branching_times)
 # then summed together.
 
 contrast = lambda a, b, e: (a - b) ** 2 / e
+
+
+def f_full3(a, b, c):
+    """Tree: ((a:t0, b:t0):t1, c:(t0+t1));"""
+    c1 = (a - b) ** 2 / (2 * t0)
+    c2 = (c - (a + b) / 2) ** 2 / (2 * t1 + 3 * t0 / 2)
+    return (c1 + c2) / 2
+
+
+def trifurcating_full3(a, b, c):
+    """Tree: ((a,b,c);"""
+    return (a - b) ** 2 / (2 * t0) + (c - (a + b) / 2) ** 2 / (3 * t0 / 2)
+
+
+def f_full(a, b, c, d, e, f):
+    c1 = contrast(a, b, 2 * t0)
+    c2 = contrast(c, d, 2 * (t0 + t1))
+    c3 = contrast(e, f, 2 * (t0 + t1 + t2))
+    x1 = (a + b) / 2
+    x2 = (c + d) / 2
+    x3 = (e + f) / 2
+    e1 = t0 / 2 + t1 + t2 + t3
+    e2 = (t0 + t1) / 2 + t2 + t3
+    e3 = (t0 + t1 + t2) / 2 + t3 + t4
+    denom = e1 + e2
+    c4 = contrast(x1, x2, denom)
+    x4 = (e1 * x2 + e2 * x1) / (e1 + e2)
+    e4 = (e1 * e2) / (e1 + e2)
+    c5 = contrast(x3, x4, e3 + e4 + t4)
+    return (c1 + c2 + c3 + c4 + c5) / 5
+
+
+def f_full_caterpillar(a, b, c, d, e, f):
+    """Tree shape: (((a,b),c),d);"""
+    #TODO: finish this
+    c1 = contrast(a, b, 2 * t0)
+    x1 = (a + b) / 2
+    e1 = t0 / 2 + sum(branching_times[1:])
+    e2 = (t0 + t1) / 2 + sum(branching_times[2:])
+    e3 = (t0 + t1 + t2) / 2 + sum(branching_times[3:])
+    denom = e1 + e2  # [:,np.newaxis]
+    # print(x1.shape,c.shape,denom.shape, ep.shape)
+    c4 = contrast(x1, c, denom)
+    x4 = (e1 * c + e2 * x1) / (e1 + e2)
+    e4 = (e1 * e2) / (e1 + e2)
+    c5 = contrast(d, x4, e3 + e4 + 2 * t4 + t3)
+    return (c1 + c2 + c3 + c4 + c5) / 5
 
 
 def enumerate_k_partitions(n, k):
@@ -128,23 +176,23 @@ def enumerate_k_partitions(n, k):
     return all_partitions
 
 
-def generate_moments(vars, cov):
-    n = len(vars)
+def generate_moments(variables, cov, max_moment=None):
+    n = len(variables)
     r = range(n)
     moments = []
-    for k in range(1, n + 1):
+    for k in range(1, max_moment or n + 1):
         m = {}
         for x in combinations_with_replacement(r, k):
             indices = enumerate_k_partitions(k, 2)
-            m[reduce(mul, (vars[i] for i in x))] = sum(
+            m[reduce(mul, (variables[i] for i in x))] = sum(
                 reduce(mul, (cov[x[i], x[j]] for i, j in ix)) for ix in indices
             )
         moments.append(m)
     return moments
 
-
 if __name__ == "__main__":
-    # balanced 6 taxa tree
+    # balanced 6 taxa
+
     cov = (
         Matrix(
             [
@@ -158,32 +206,41 @@ if __name__ == "__main__":
         )
         * sigma**2
     )
-    moments = reversed(generate_moments(vars, cov))
-    #print( ' '.join(str(s[0])+'->'+str(s[1]) for d in moments for s in d))
-    def substitute_moments(expr: str):
-        expr = parse_expr(expr)
+    moments = list(reversed(generate_moments(variables, cov, cov.shape[1] + 1)))
+
+    pic = expand(f_full(*variables))
+    pic_v = expand(pic**2 - sigma**4)
+    fn = "pic_v_6balanced_terms.txt.gz"
+    #    with open(fn, "wb") as f:
+    #        for term in pic_v.args:
+    #            f.write(str(term) + "\n")
+    #        f.write('---------'
+    #        )
+    #    with gzip.open('pic_balanced6_terms.pkl.gz', 'wb') as f:
+    #        pickle.dump(args, f)
+
+    print(f"wrote terms to {fn}, reduction is {pic_v.func}")
+
+    def substitute_moments(expr):
         for m in moments:
-            expr = expr.subs(m)
-        return simplify(expr)
+            expr = expr.subs(m, simultaneous=True)
+        return expr
 
-    fn = "pic_v_6balanced_terms.txt"
-    # terms = f.readlines()
+    f = pic_v.func
 
-    with Parallel(n_jobs=40) as parallel:
-        with open(fn, "r") as f:
-            args = parallel(
-                delayed(substitute_moments)(arg.strip()) for arg in f if "----" not in arg
-            )
+    with Parallel(n_jobs = n_jobs) as parallel:
+        args = parallel(delayed(substitute_moments)(arg) for arg in pic_v.args)
 
-    fn = "pic_v_6balanced_terms.expectation.txt"
-    with open(fn, "w") as fout:
-        for term in args:
-            fout.write(str(term) + "\n")
-        fout.write("---------")
+    with gzip.open("pic_v.pkl.gz", "wb") as outf:
+        pickle.dump(args, outf)
 
-    f = Add
+    print('wrote pic var obj')
+
+    # with open("pic_v.pkl") as inf:
+    #     y = pickle.load(inf)
+
     pic_v = simplify(f(*args))
     print(pic_v)
 
-    with open("pic_expect_simple.pkl", "wb") as outf:
+    with gzip.open("pic_simple.pkl.gz", "wb") as outf:
         pickle.dump(pic_v, outf)

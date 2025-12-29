@@ -10,6 +10,7 @@ from sympy.parsing.sympy_parser import parse_expr
 from itertools import combinations, permutations, combinations_with_replacement
 from operator import mul
 from functools import *
+from itertools import zip_longest
 
 # Define the symbols used in the expression
 # 'a', 'b', 'c', 'd' are general variables.
@@ -136,15 +137,16 @@ def generate_moments(vars, cov):
         m = {}
         for x in combinations_with_replacement(r, k):
             indices = enumerate_k_partitions(k, 2)
-            m[reduce(mul, (vars[i] for i in x))] = sum(
+            key = reduce(mul, (vars[i] for i in x))
+            value = sum(
                 reduce(mul, (cov[x[i], x[j]] for i, j in ix)) for ix in indices
             )
+            m[str(key)]  = str(value)
         moments.append(m)
     return moments
 
 
 if __name__ == "__main__":
-    # balanced 6 taxa tree
     cov = (
         Matrix(
             [
@@ -159,31 +161,55 @@ if __name__ == "__main__":
         * sigma**2
     )
     moments = reversed(generate_moments(vars, cov))
-    #print( ' '.join(str(s[0])+'->'+str(s[1]) for d in moments for s in d))
+
     def substitute_moments(expr: str):
-        expr = parse_expr(expr)
         for m in moments:
-            expr = expr.subs(m)
-        return simplify(expr)
+            for k,v in m.items():
+                expr = expr.replace(k,v)
+        return expr
 
     fn = "pic_v_6balanced_terms.txt"
     # terms = f.readlines()
 
-    with Parallel(n_jobs=40) as parallel:
+    with Parallel(n_jobs=20) as parallel:
         with open(fn, "r") as f:
             args = parallel(
                 delayed(substitute_moments)(arg.strip()) for arg in f if "----" not in arg
             )
 
-    fn = "pic_v_6balanced_terms.expectation.txt"
+    fn = "pic_v_6balanced_terms.expectation.str.txt"
+
     with open(fn, "w") as fout:
         for term in args:
             fout.write(str(term) + "\n")
         fout.write("---------")
 
-    f = Add
-    pic_v = simplify(f(*args))
-    print(pic_v)
+    with open(fn, "r") as fin:
+        args = fin.readlines()[:-1]
 
-    with open("pic_expect_simple.pkl", "wb") as outf:
+    reducer = Add
+
+    pic_v = simplify(reducer(*list(parse_expr(a) for a in args)))
+
+    njobs=20
+
+    with Parallel(n_jobs=njobs) as parallel:
+        args = parallel(
+            
+            delayed(lambda x: simplify(f(*map(parse_expr, x))))
+            (addends) for addends in zip_longest(*[iter(args)] * (len(args) //njobs))
+        )
+
+
+    with open("pic_v_6balanced_terms.expectation.reduced.str.txt", "w") as fout:
+        for term in args:
+            fout.write(str(term) + "\n")
+        fout.write("---------")
+
+
+    print(pic_v)
+    with open("pic_expect_simple.str.txt", "w") as outf:
+        outf.write(str(pic_v))
+
+    with open("pic_expect_simple.str.pkl", "wb") as outf:
         pickle.dump(pic_v, outf)

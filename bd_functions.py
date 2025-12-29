@@ -193,6 +193,7 @@ def gterm(i, j, k):
             raise
 
 
+# @njit(parallel=True)
 
 
 @lru_cache(maxsize=400)
@@ -230,6 +231,12 @@ def lineages_through_time_nodes(
                         p_a = g(ai, i_a, e_a.length) * a[ai]
                         p_b = g(bi, i_b, e_b.length) * b[bi]
                         probs[i_a + i_b] += p_a * p_b
+                    # # print(ai+bi, j, e.length,'p',p)
+                    # if epsilon>0 and p<epsilon: #and p0<epsilon :
+                    #     break # don't know if p's are increasing or decreasing
+                    # probs[j] += p*a[ai]*b[bi]
+                    # print(probs[j])
+                    # p0=p
         children.append(probs)
         n_edges += 1
         # if n_edges>400:break

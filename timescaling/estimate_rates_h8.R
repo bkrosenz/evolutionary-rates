@@ -8,6 +8,7 @@ library(parallel)
 # trees<-lapply,(filename))
 np <- import("numpy")
 
+setwd('/N/project/phyloML/rate_timescaling/evorates')
 #add trend parameter
 
 estimate_trend <- function(t,xx,chains=4){

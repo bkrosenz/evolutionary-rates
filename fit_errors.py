@@ -25,15 +25,20 @@ params = {
 }
 
 # Initialize the XGBoost Regressor model
-estimators = {"sigma":r"$\hat{\sigma}_{PIC}$",
-              "sigma_js":r"$\hat{\sigma}_{JS}$",
-              "sigma_cherry":r"$\hat{\sigma}_{cherry}$",
-                "sigma_paired":r"$\hat{\sigma}_{paired}$",
-              }
+estimators = {
+    "sigma": r"$\hat{\sigma}_{PIC}$",
+    "sigma_js": r"$\hat{\sigma}_{JS}$",
+    "sigma_cherry": r"$\hat{\sigma}_{cherry}$",
+    "sigma_paired": r"$\hat{\sigma}_{paired}$",
+    "sigma_ape": r"$\hat{\sigma}^2_{ape}$",
+    "sigma_geig": r"$\hat{\sigma}^2_{geiger}$",
+}
 
 x = pd.read_csv(
-    "/N/project/phyloML/rate_timescaling/data/pic_predictions_no_ils.csv.gz",
+    "/N/project/phyloML/rate_timescaling/data/pic_dendropy_predictions_no_ils.csv.gz",
     index_col=0,
+).drop(
+    columns=["sigma_js_old", "tree_ix"], errors="ignore"
 )  # .reset_index()
 
 query = argv[1]
@@ -101,7 +106,10 @@ with open("feature_importances/" + qstr + ".txt", "w") as logfile:
         sns.barplot(x=feature_importances.values, 
                     y=feature_importances.index) # TODO: fix this so that feat_names actually map to features
         plt.title(estimators[var])
+        plt.ylabel("Feature")
+        plt.xlabel("Importance (Gain)")
         plt.savefig(figdir / f"xgb_features_gain_{var}.png")
+        plt.clf()
         # plt.savefig(f"figures/xgb_features_{var}_mae.png")
         y_pred = model.predict(X_train)
 

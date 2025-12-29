@@ -18,6 +18,7 @@ run_sims <- function() {
                    ".RData",
                    sep = "")
   results = list()
+  # try ( load(filename))
   for (sp_tree in 1:length(trees)) {
     arr = paste("arr_", sp_tree - 1, sep = "")
     x <- npz1$f[[arr]][1:replicates, ]

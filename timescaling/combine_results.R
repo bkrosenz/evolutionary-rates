@@ -9,9 +9,18 @@ library(dplyr)
 library("GGally")                      # Load GGally package
 p_ <- GGally::print_if_interactive
 library('ggplot2')
+
+# setHook(packageEvent("grDevices", "onLoad"),
+#         function(...) grDevices::X11.options(type='cairo'))
+# options(device='x11')
+
+
 replicates = 20
 
-ngenes = 1 #0 
+# TODO: rewrite in python
+
+ngenes = 1#0 
+# ngenes = 25
 
 args = commandArgs(trailingOnly=TRUE)
 if (length(args)>0){
@@ -23,7 +32,8 @@ if (length(args)>0){
   model='rate_trend'
   
 }
-output_dir = 'output'
+
+datadir = '/N/project/phyloML/rate_timescaling/data/tree_sims/l2.5/m1.750/h7/no_ils'
 filename=paste(datadir,'/',
                model,"_estimates_ngenes", 
                ngenes,"_r", replicates, ".RData", 
@@ -40,13 +50,14 @@ source('analysis_functions.R')
 
 # USE ALL THE DATAPOINTS:
 predictions = get_full_results(
-  data_dir,
-  genes = 0 # 25
+  '/N/project/phyloML/rate_timescaling/data/tree_sims/*/*/h*',
+  ngenes = 0 # 25
   )
 
 # for NO ILS condition Pr(Accelerating) \propto H*(lambda-mu):
 
 predictions<-  predictions %>% mutate(mae=abs(1-sig)) #hr=h*r,hrho=h*rho,
+setwd('/N/project/phyloML/rate_timescaling/evorates')
 predictions %>% write_csv("../data/evorates_preds.csv.gz")
 
 algnames =  c('EB','rate_trend','delta')
@@ -60,9 +71,12 @@ for (m in algnames ){
   print(mean(d$sig,na.rm=T))
   ggplot(predictions %>% filter(model==m), 
          aes(sig,fill=as.factor(model))) + geom_histogram() + scale_x_log10()
+  # ggplot(predictions,aes(x=sig,fill =as.factor(model) )) + geom_histogram() + scale_x_log10()
+  
 }
 
 
+# CairoPNG('../figures/timescaling/mae.png', width = 800, height = 600, res = 150)
 ggplot(
   predictions %>% mutate(model=as.factor(model)) %>% filter(hr<15),# %>%filter(model=='rate_trend'),
        aes(x=hr,y=mae,
@@ -98,7 +112,7 @@ pac= predictions %>%select(accelerating, r,rho,h,h_inv,model)
 pac$accelerating=as.data.frame(pac$accelerating)
 pac=pac%>%unnest(accelerating) %>% pivot_longer(cols=starts_with('V'),values_to = 'accelerating',names_to = 'block') %>% drop_na()
 
-g = glm(formula=accelerating ~ model+(r+rho)*h+h_inv+block,data = pac,family=binomial) 
+g = glm(formula=accelerating ~ model+(r+rho)*h+h_inv+block,data = pac,family=binomial) # TODO: mixed effect model. blocks are exchangeable 
 # a = aov(as.formula('accelerating ~ model+r+rho+h+block'),data = pac) # not for binary data!
 summary(g)
 
@@ -107,16 +121,17 @@ predictions$std = apply(predictions$value,1, function(r) sd(r,na.rm = T))
 predictions$mean_value = apply(predictions$value,1, function(r) mean(r,na.rm = T))
 
 save(predictions, 
-     file = paste(output_dir,'preds_ils.Rdata', sep='/'))
+     file = '/N/project/phyloML/rate_timescaling/data/tree_sims/preds_ils.Rdata')
 predictions_no_ils = get_full_results(
-  paste(datadir,'*/*/h*/no_ils',sep='/'),
+  '/N/project/phyloML/rate_timescaling/data/tree_sims/*/*/h*/no_ils',
   ngenes = 1)
 save(predictions_no_ils, 
-     file = paste(output_dir,'preds_no_ils.Rdata', sep='/'))
+file = '/N/project/phyloML/rate_timescaling/data/tree_sims/preds_ils_no_ils
+     .Rdata')
 
 ##################### use means
 rdf = analyze_results(
-  paste(datadir,'*/*/h*/no_ils',sep='/'),
+  '/N/project/phyloML/rate_timescaling/data/tree_sims/*/*/h*',
   ngenes = 10)
 # rdf=rdf[!is.na(rdf$CI),]
 
@@ -125,10 +140,10 @@ rdf$rho_h = rdf$rho* rdf$h
 rdf$r_over_h = rdf$r / rdf$h
 rdf$rho_over_h = rdf$rho / rdf$h
 save(rdf, 
-     file = paste(datadir,'rdf_ils.Rdata',sep='/'))
+     file = '/N/project/phyloML/rate_timescaling/data/tree_sims/rdf_ils.Rdata')
 
 rdf_null = analyze_results(
-  paste(datadir,'*/*/h*/no_ils',sep='/'),
+  '/N/project/phyloML/rate_timescaling/data/tree_sims/*/*/h*/no_ils',
   ngenes = 1)
 rdf_null$r_h = rdf_null$r * rdf_null$h
 rdf_null$rho_h = rdf_null$rho* rdf_null$h
@@ -136,7 +151,7 @@ rdf_null$r_over_h = rdf_null$r / rdf_null$h
 rdf_null$rho_over_h = rdf_null$rho / rdf_null$h
 
 save(rdf_null, 
-     file = paste(datadir,'rdf_no_ils.Rdata',sep='/'))
+     file = '/N/project/phyloML/rate_timescaling/data/tree_sims/rdf_no_ils.Rdata')
 
 
 figdir='/N/project/phyloML/rate_timescaling/figures/'
@@ -145,6 +160,7 @@ for (m in c('delta','rate_trend','EB')){
   # title=paste("Model: ",m, "(with ILS, scaled)")
   title=paste("Model: ",m, "(with ILS)")
   pm<-ggpairs(
+    # rdf  %>% filter(model==!!m)%>%select(c(accelerating,CI,r_h,rho_h)),
     rdf %>% filter(model==!!m)%>%select(c(accelerating,CI,r,rho,h)),
     lower = list(continuous = "cor", combo = "box_no_facet", discrete = "count", na = "na"),
     upper = list(continuous = "points", combo = "facethist", discrete = "facetbar", na =
@@ -152,9 +168,14 @@ for (m in c('delta','rate_trend','EB')){
     title=title  )
   p_(pm)
   ggsave(paste(figdir,title,".pdf"),width=11,height = 11)
+
+  # pdf(file = paste(figdir,title,".pdf"))
+  # dev.set(which = 2)
+  # dev.copy(which = 4)
   dev.off()
   
 }
+# pairs(rdf[rdf$model=='EB', c(1,2,3,4,5,6,8,9)])
 
 cor(rdf[rdf$model=='EB', -7], method = 'spearman')
 
@@ -184,7 +205,16 @@ make_pair_plots = function(df,scaling,condition){
         title=title  )
     }
     p_(pm)
+    # 
+    # pairs(
+    #   # rdf_null %>% filter(model==!!m)%>%select(c(accelerating,CI,r_over_h,rho_over_h)),
+    #   # rdf_null %>% filter(model==!!m)%>%select(c(accelerating,CI,r_h,rho_h)),
+    #   
+    #       rdf %>% filter(model==!!m)%>%select(c(accelerating,CI,r,rho,h)),
+    #   main=title  )
     ggsave(paste(figdir,title,".pdf"),width=11,height = 11)
+    # dev.set(which = 2)
+    # dev.copy(which = 4)
     dev.off()
     
   }
@@ -244,7 +274,14 @@ compare_stretched_trees <- function(d,model,ngenes=10,title='Scaled Trees'){
   # print(results[[1]][[1]]$CI)
   e = get_all_ml_estimates(results,model)
   a = get_accel(e, model,reduce='mean')
-  hist(a$accelerating,xlab='Pr(Acceleration)',breaks=10,xlim=c(0,1),ylim=c(0,95),main=title)
+  hist(
+    a$accelerating,
+    xlab='Pr(Acceleration)',
+    breaks=10,
+    xlim=c(0,1),
+    ylim=c(0,95),
+    main=title)
+  # hist(ils$accelerating, xlab='Pr(Acceleration)',breaks=10,xlim=c(0,1),ylim=c(0,95),main='Unscaled Trees')  
 }
 
 map <- c("delta" = "Delta", "EB" = "ACDC", "rate_trend" = "LT")
@@ -257,3 +294,7 @@ ggsave('../figures/timescaling/accel.png')
 
 ggplot(cp)+aes(x=hr,y=EI_CI,color=as.factor(model))+geom_point()+ labs(x = 'Hr',y=expression('EI'['CI'])) +      guides(color = guide_legend(title = "Model"))
 ggsave('../figures/timescaling/ci.png')
+### TODO: export full CI/accelerating preds to npz.  logistic reg with taus 1:20
+
+# taus <- np$load(sample_file_name)
+

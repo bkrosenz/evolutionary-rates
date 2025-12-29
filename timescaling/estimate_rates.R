@@ -50,6 +50,7 @@ print(paste(datadir, model, sep = ' '))
 
 #quit()
 
+setwd('/N/project/phyloML/rate_timescaling/evorates')
 source("functions.R")
 trees <- tryCatch(
   read.tree(paste(datadir, '/parent_trees_4plus_pos_edges.phy', sep = '')),

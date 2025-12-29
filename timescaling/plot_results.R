@@ -12,6 +12,7 @@ if (length(args)>0){
   datadir = '../data/m0.8_h9_s5/'
 }
 
+setwd('/N/project/phyloML/rate_timescaling/evorates')
 trees<- read.tree(paste(datadir,'parent_trees_4plus.phy',sep=''))
 
 load(paste(datadir,'EB_a_estimates_ngenes50_r50.RData'))
